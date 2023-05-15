@@ -1,0 +1,148 @@
+esphome:
+  name: mushroombox
+
+esp8266:
+  board: d1_mini
+  restore_from_flash: true
+
+# Enable logging
+logger:
+
+ota:
+  password: "8bd619f3f098c60427d9ffd802422226"
+
+web_server:
+  port: 80  
+  local: true
+
+wifi:
+  ap: {}
+#   ssid: "XXX"
+#   password: "XXX"
+#captive_portal:
+
+i2c:
+  sda: D2
+  scl: D1
+
+font:
+  - file: "OpenSans-Regular.ttf"
+    id: opensans_font
+    size: 15
+
+sensor:
+ - platform: bme280
+   update_interval: 3s
+   temperature:
+     id: temperature
+     name: "Temperature"
+     on_value:
+       lambda: |-
+         if (id(temperature).state < id(target_temperature).state - id(delta_temperature).state) {
+          id(temperature_switch).turn_on();
+         } else if (id(temperature).state > id(target_temperature).state + id(delta_temperature).state) {
+          id(temperature_switch).turn_off();
+         }
+
+   pressure:
+     id: pressure
+     name: "Pressure"
+   humidity:
+     id: humidity
+     name: "Humidity"
+     on_value:
+       lambda: |-
+         if (id(humidity).state < id(target_humidity).state - id(delta_humidity).state) {
+          id(humidity_switch).turn_on();
+         } else if (id(humidity).state > id(target_humidity).state + id(delta_humidity).state) {
+          id(humidity_switch).turn_off();
+         }
+   address: 0x76
+
+display:
+  - platform: ssd1306_i2c
+    id: my_display  
+    model: "SSD1306 128x64"
+    reset_pin: D0
+    address: 0x3C
+    pages:
+      - id: page1
+        lambda: |-
+          it.printf(0, 0, id(opensans_font), TextAlign::TOP_LEFT, "T %.1f (%.1f, %.1f)", id(temperature).state, id(target_temperature).state, id(delta_temperature).state);
+          it.printf(0, 20, id(opensans_font), TextAlign::TOP_LEFT, "H %.1f (%.1f, %.1f)", id(humidity).state, id(target_humidity).state, id(delta_humidity).state);
+          it.printf(0, 40, id(opensans_font), TextAlign::TOP_LEFT, "P %.1f hPa", id(pressure).state);
+      - id: page2
+        lambda: |-
+          it.printf(0, 0, id(opensans_font), "Temperature %s", id(temperature_switch).state ? "ON" : "OFF");
+          it.printf(0, 20, id(opensans_font), "Humidity %s", id(humidity_switch).state ? "ON" : "OFF");
+      - id: page3
+        lambda: |-
+          it.printf(0, 0, id(opensans_font), "192.168.4.1");
+#         it.printf(0, 20, id(opensans_font), "%s", id(tcp_ip_address).state.c_str());
+   
+interval:
+  - interval: 5s
+    then:
+      - display.page.show_next: my_display
+      - component.update: my_display
+
+# text_sensor:
+#   - platform: template
+#     name: "IP Address"
+#     lambda: 'return {WiFi.localIP().toString().c_str()};'
+#     id: tcp_ip_address
+
+switch:
+  - platform: gpio
+    pin: D5
+    id: temperature_switch
+    name: "Temperature socket"
+    inverted: true
+  - platform: gpio
+    pin: D6
+    id: humidity_switch
+    name: "Humidity socket"
+    inverted: true
+
+number:
+  - platform: template
+    name: "Target Temperature"
+    device_class: Temperature
+    optimistic: true
+    min_value: 5
+    max_value: 35
+    step: 0.5  
+    initial_value: '21.0'
+    restore_value: True
+    id: target_temperature
+  - platform: template
+    name: "Temperature delta"
+    device_class: Temperature
+    optimistic: true
+    min_value: 0
+    max_value: 5
+    step: 0.5  
+    initial_value: 0
+    restore_value: True
+    id: delta_temperature
+
+  - platform: template
+    name: "Target Humidity"
+    device_class: Temperature
+    optimistic: true
+    min_value: 0
+    max_value: 100
+    step: 1  
+    initial_value: 50.0
+    restore_value: True
+    id: target_humidity
+  - platform: template
+    name: "Humidity delta"
+    device_class: Temperature
+    optimistic: true
+    min_value: 0
+    max_value: 10
+    step: 0.5  
+    initial_value: 0
+    restore_value: True
+    id: delta_humidity  
